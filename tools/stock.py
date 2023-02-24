@@ -1,6 +1,7 @@
 import pandas as pd
 from jqdatasdk import *
 import datetime
+import time
 import os
 
 JQ_PHONE = os.getenv('JQ_PHONE')
@@ -16,16 +17,22 @@ data_root = os.path.realpath(__file__).split('trading')[0] + 'trading/output'
 print(f'Data root path: {data_root}')
 
 
-def init_db():
+def init_db(skip_exists=True, fetch_interval_millis=100):
     """
     init all stock
+    :param skip_exists whether skip when exists
+    :param fetch_interval_millis sleep millis between fetches
     :return:
     """
     stocks = get_stock_list()
+    data_type = 'price'
     for code in stocks:
+        if skip_exists and file_exists(code, data_type):
+            continue
         df = get_single_price(code, 'daily')
-        save_data(df, code, 'price')
+        save_data(df, code, data_type)
         print(f'{code}: {df.head()}')
+        time.sleep(fetch_interval_millis / 1000)
 
 
 def get_stock_list():
@@ -64,7 +71,11 @@ def save_data(data: pd.DataFrame, filename, data_type, mode='w'):
     :param mode: a is for append, w is for write
     :return:
     """
-    file_path = data_root + '/' + data_type + '/' + filename + '.csv'
+    # check folder exists
+    folder = _folder_with_type(data_type)
+    if not os.path.exists(folder):
+        os.mkdir(folder)
+    file_path = _filepath_with_type(filename, data_type)
     data.index.names = ['date']
     if mode == 'a':
         data.to_csv(file_path, mode=mode, header=False)
@@ -75,6 +86,16 @@ def save_data(data: pd.DataFrame, filename, data_type, mode='w'):
     else:
         data.to_csv(file_path)
     print(f'Save data success: {file_path}')
+
+
+def file_exists(filename, data_type):
+    """
+    check file exists
+    :param filename:
+    :param data_type:
+    :return: Bool
+    """
+    os.path.exists(_filepath_with_type(filename, data_type))
 
 
 def get_single_valuation(stock_code, date, stat_date):
@@ -105,7 +126,7 @@ def update_daily_price(stock_code, data_type='price'):
     :param data_type:
     :return:
     """
-    file_path = data_root + '/' + data_type + '/' + stock_code + '.csv'
+    file_path = _filepath_with_type(stock_code, data_type)
     if os.path.exists(file_path):
         start_date = pd.read_csv(file_path, usecols=['date'])['date'].iloc[-1]
         df = get_single_price(stock_code, 'daily', start_date=start_date, end_date=datetime.datetime.today())
@@ -114,3 +135,15 @@ def update_daily_price(stock_code, data_type='price'):
         df = get_single_price(stock_code, 'daily')
         save_data(df, stock_code, 'price')
     print(f'Stock price update success: {stock_code}')
+
+
+def _filepath_with_type(filename, data_type, suffix='.csv'):
+    return data_root + '/' + data_type + '/' + filename + suffix
+
+
+def _folder_with_type(data_type):
+    return data_root + '/' + data_type
+
+
+if __name__ == '__main__':
+    init_db()
