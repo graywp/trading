@@ -95,7 +95,7 @@ def file_exists(filename, data_type):
     :param data_type:
     :return: Bool
     """
-    os.path.exists(_filepath_with_type(filename, data_type))
+    return os.path.exists(_filepath_with_type(filename, data_type))
 
 
 def get_single_valuation(stock_code, date, stat_date):
